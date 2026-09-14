@@ -213,6 +213,9 @@
     <Compile Include="ImportExportWindow.xaml.cs">
       <DependentUpon>ImportExportWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="TalentTreeEditorWindow.xaml.cs">
+      <DependentUpon>TalentTreeEditorWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Sources\AI\AIController.cs" />
     <Compile Include="Sources\AI\AiEnumRegistry.cs" />
     <Compile Include="Sources\AI\AISemanticRegistry.cs" />
@@ -331,6 +334,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="ImportExportWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="TalentTreeEditorWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

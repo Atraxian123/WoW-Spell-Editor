@@ -1320,6 +1320,11 @@
                     <TextBlock Text="{DynamicResource butLogBook}" VerticalAlignment="Center"/>
                 </StackPanel>
              </Button>
+             <Button Name="TalentTreeEditorButton" Click="TalentTreeEditorButtonClick" ToolTip="Visualize and edit custom talent trees / specializations (aa_vista_talent_slots, aaa_custom_spell_tab)">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Talent Trees" VerticalAlignment="Center"/>
+                </StackPanel>
+             </Button>
              <Button Name="OpenAIButton" Click="OpenAIButtonClick" ToolTip="Open AI-assisted spell generation">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="OpenAI" VerticalAlignment="Center"/>

@@ -66,6 +66,45 @@ namespace SpellEditor.Sources.Config
                 Save();
             }
         }
+        public static string CharactersDatabase
+        {
+            get { return GetConfigValue("MySQL/CharactersDatabase"); }
+            set
+            {
+                UpdateConfigValue("MySQL/CharactersDatabase", value);
+                Save();
+            }
+        }
+
+        // Separate connection details for the talents database (aaa_custom_spell_tab,
+        // aa_specialization, aa_talents, aa_talent_slot), independent of the main
+        // Host/Port/User/Pass/Database used for spell.dbc editing - may be a different
+        // database on the same server, or an entirely different server.
+        public static string TalentsHost
+        {
+            get { return GetConfigValue("MySQL/TalentsHost"); }
+            set { UpdateConfigValue("MySQL/TalentsHost", value); Save(); }
+        }
+        public static string TalentsPort
+        {
+            get { return GetConfigValue("MySQL/TalentsPort"); }
+            set { UpdateConfigValue("MySQL/TalentsPort", value); Save(); }
+        }
+        public static string TalentsUser
+        {
+            get { return GetConfigValue("MySQL/TalentsUser"); }
+            set { UpdateConfigValue("MySQL/TalentsUser", value); Save(); }
+        }
+        public static string TalentsPass
+        {
+            get { return GetConfigValue("MySQL/TalentsPass"); }
+            set { UpdateConfigValue("MySQL/TalentsPass", value); Save(); }
+        }
+        public static string TalentsDatabase
+        {
+            get { return GetConfigValue("MySQL/TalentsDatabase"); }
+            set { UpdateConfigValue("MySQL/TalentsDatabase", value); Save(); }
+        }
         public static string BindingsDirectory
         {
             get { return GetConfigValue("BindingsDirectory"); }

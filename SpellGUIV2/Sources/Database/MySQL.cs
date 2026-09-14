@@ -49,6 +49,29 @@ namespace SpellEditor.Sources.Database
             _heartbeat = CreateKeepAliveTimer(TimeSpan.FromMinutes(2));
         }
 
+        /// <summary>
+        /// Connects to an explicit host/database rather than the globally configured one, so a
+        /// second, independent connection (e.g. a separate "talents" database, possibly on a
+        /// different server entirely) can be opened alongside the main spell-editing connection.
+        /// </summary>
+        public MySQL(string host, string port, string user, string pass, string database, bool initialiseDatabase = false)
+        {
+            string connectionString = $"server={host};port={port};uid={user};pwd=\"{pass}\";Charset=utf8mb4;";
+
+            _connection = new MySqlConnection { ConnectionString = connectionString };
+            _connection.Open();
+
+            using (var cmd = _connection.CreateCommand())
+            {
+                cmd.CommandText = initialiseDatabase
+                    ? string.Format("CREATE DATABASE IF NOT EXISTS `{0}`; USE `{0}`;", database)
+                    : string.Format("USE `{0}`;", database);
+                cmd.ExecuteNonQuery();
+            }
+
+            _heartbeat = CreateKeepAliveTimer(TimeSpan.FromMinutes(2));
+        }
+
         public void Dispose()
         {
             _heartbeat?.Dispose();

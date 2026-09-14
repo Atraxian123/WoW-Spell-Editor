@@ -711,6 +711,20 @@ namespace SpellEditor
 
         private ImportExportWindow _ImportExportWindow;
 
+        private TalentTreeEditorWindow _TalentTreeEditorWindow;
+
+        private void TalentTreeEditorButtonClick(object sender, RoutedEventArgs e)
+        {
+            if (_TalentTreeEditorWindow != null && _TalentTreeEditorWindow.IsVisible)
+            {
+                _TalentTreeEditorWindow.Activate();
+                return;
+            }
+            var window = new TalentTreeEditorWindow(adapter);
+            window.Show();
+            _TalentTreeEditorWindow = window;
+        }
+
         #region ImportExportSpellDBC
         private void ImportExportSpellDbcButton(object sender, RoutedEventArgs e)
         {

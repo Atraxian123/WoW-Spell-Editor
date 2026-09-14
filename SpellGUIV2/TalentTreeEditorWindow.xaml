@@ -1,0 +1,144 @@
+﻿<controls:MetroWindow
+        x:Class="SpellEditor.TalentTreeEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
+        Title="Talent Tree Editor"
+        Height="820"
+        Width="1400"
+        WindowStartupLocation="CenterScreen"
+        Icon="icon.ico"
+        Loaded="_Loaded"
+        BorderBrush="#1585B5"
+        BorderThickness="2">
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Talents database connection - separate from the main spell.dbc connection -->
+        <Grid Grid.Row="0" Margin="0,0,0,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="130"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="60"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="110"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="110"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="130"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Label Content="Talents DB - Host:" Grid.Column="0" VerticalAlignment="Center"/>
+            <TextBox Name="TalentsHostTextBox" Grid.Column="1" VerticalAlignment="Center"/>
+
+            <Label Content="Port:" Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0"/>
+            <TextBox Name="TalentsPortTextBox" Grid.Column="3" VerticalAlignment="Center"/>
+
+            <Label Content="User:" Grid.Column="4" VerticalAlignment="Center" Margin="8,0,0,0"/>
+            <TextBox Name="TalentsUserTextBox" Grid.Column="5" VerticalAlignment="Center"/>
+
+            <Label Content="Password:" Grid.Column="6" VerticalAlignment="Center" Margin="8,0,0,0"/>
+            <PasswordBox Name="TalentsPassBox" Grid.Column="7" VerticalAlignment="Center"/>
+
+            <Label Content="Database:" Grid.Column="8" VerticalAlignment="Center" Margin="8,0,0,0"/>
+            <TextBox Name="TalentsDatabaseTextBox" Grid.Column="9" VerticalAlignment="Center"
+                     ToolTip="The database holding aaa_custom_spell_tab, aa_specialization, aa_talents and aa_talent_slot (e.g. your AzerothCore 'characters' database). This connection is entirely separate from the one used for spell.dbc editing - it can point at a different database, or a different server altogether."/>
+
+            <Button Name="ConnectTalentsButton" Content="Connect" Grid.Column="10" Margin="12,0,0,0" Click="ConnectTalentsButton_Click"/>
+
+            <TextBlock Name="TalentsConnectionStatus" Grid.Column="11" VerticalAlignment="Center" Margin="12,0,0,0" Foreground="Gray" Text="Not connected"/>
+        </Grid>
+
+        <!-- Class / spec selection bar -->
+        <Grid Grid.Row="1" Margin="0,0,0,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Label Content="Class:" Grid.Column="0" VerticalAlignment="Center"/>
+            <ComboBox Name="ClassComboBox" Grid.Column="1" VerticalAlignment="Center"
+                      SelectionChanged="ClassComboBox_SelectionChanged"/>
+
+            <Button Name="ReloadButton" Content="Reload" Grid.Column="2" Margin="12,0,0,0" Click="ReloadButton_Click"/>
+
+            <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Name="AddSpecButton" Content="New Specialization" Margin="4,0" Click="AddSpecButton_Click"/>
+                <Button Name="AddTalentButton" Content="New Talent" Margin="4,0" Click="AddTalentButton_Click"/>
+                <Button Name="SaveAllButton" Content="Save All Changes" Margin="4,0" Click="SaveAllButton_Click" FontWeight="Bold"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Specialization tabs for the selected class -->
+        <ListBox Name="SpecListBox" Grid.Row="2" Height="40" Margin="0,0,0,6"
+                  SelectionMode="Single"
+                  SelectionChanged="SpecListBox_SelectionChanged"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                  ScrollViewer.VerticalScrollBarVisibility="Disabled">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding Name}" Padding="10,4" FontSize="14"/>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Main content: tree canvas on the left, edit panels on the right -->
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="6"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" BorderBrush="#444" BorderThickness="1">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <Canvas Name="TreeCanvas" Width="900" Height="900" Background="#1E1E1E"/>
+                </ScrollViewer>
+            </Border>
+
+            <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="#333"/>
+
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Specialization (aaa_custom_spell_tab) metadata editor -->
+                <GroupBox Header="Specialization" Grid.Row="0" Margin="6,0,0,6">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Name="SpecEditorPanel" Margin="4"/>
+                    </ScrollViewer>
+                </GroupBox>
+
+                <Button Name="DeleteSpecButton" Content="Delete This Specialization" Grid.Row="1" Margin="6,0,0,6" Click="DeleteSpecButton_Click"/>
+
+                <!-- Talent slot (aa_vista_talent_slots) editor -->
+                <GroupBox Header="Selected Talent" Grid.Row="2" Margin="6,0,0,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="4">
+                            <StackPanel Name="TalentEditorPanel"/>
+                            <Button Name="DeleteTalentButton" Content="Delete This Talent" Margin="0,8,0,0" Click="DeleteTalentButton_Click"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </GroupBox>
+            </Grid>
+        </Grid>
+    </Grid>
+</controls:MetroWindow>
