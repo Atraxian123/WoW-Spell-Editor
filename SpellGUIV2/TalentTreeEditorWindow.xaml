@@ -109,11 +109,26 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" BorderBrush="#444" BorderThickness="1">
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                    <Canvas Name="TreeCanvas" Width="900" Height="900" Background="#1E1E1E"/>
-                </ScrollViewer>
-            </Border>
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" BorderBrush="#444" BorderThickness="1" Background="#2A2A2A" Margin="0,0,0,4" Padding="6">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Click an empty tile on the grid to create a talent there." Foreground="Gray" VerticalAlignment="Center"/>
+                        <TextBlock Name="NewTalentPreviewText" Margin="16,0,0,0" VerticalAlignment="Center" FontWeight="Bold" Visibility="Collapsed"/>
+                        <Button Name="CreateTalentHereButton" Content="Create Talent Here" Margin="16,0,0,0" Click="CreateTalentHereButton_Click" Visibility="Collapsed"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="1" BorderBrush="#444" BorderThickness="1">
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                        <Canvas Name="TreeCanvas" Width="900" Height="900" Background="#1E1E1E"/>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
 
             <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="#333"/>
 

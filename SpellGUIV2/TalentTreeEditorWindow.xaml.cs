@@ -44,6 +44,8 @@ namespace SpellEditor
 
         private SpecRow _selectedSpec;
         private TalentSlotRow _selectedTalent;
+        private int? _pendingNewRow;
+        private int? _pendingNewColumn;
 
         // Caches so hovering/re-rendering doesn't re-query the spell DB for the same ID repeatedly
         private readonly Dictionary<int, string> _spellNameCache = new Dictionary<int, string>();
@@ -178,7 +180,10 @@ namespace SpellEditor
         {
             _talents.Clear();
             _selectedTalent = null;
+            _pendingNewRow = null;
+            _pendingNewColumn = null;
             RenderTalentEditor();
+            UpdateNewTalentPreview();
 
             if (_selectedSpec == null || _talentsAdapter == null)
             {
@@ -239,13 +244,16 @@ namespace SpellEditor
         {
             TreeCanvas.Children.Clear();
 
-            if (_talents.Count == 0)
-                return;
+            // Even with zero talents yet (a brand new spec), still show a base grid of empty,
+            // clickable tiles so a talent tree can be started from scratch.
+            var maxRow = _talents.Count == 0 ? 5 : Math.Max(5, _talents.Max(t => t.Row));
+            var maxCol = _talents.Count == 0 ? 3 : Math.Max(3, _talents.Max(t => t.Column));
+            // A little extra room beyond the current content so there's always somewhere to grow into
+            var gridMaxRow = maxRow + 2;
+            var gridMaxCol = maxCol + 2;
 
-            var maxRow = _talents.Max(t => t.Row);
-            var maxCol = _talents.Max(t => t.Column);
-            TreeCanvas.Width = Math.Max(900, (maxCol + 2) * CellWidth);
-            TreeCanvas.Height = Math.Max(900, (maxRow + 2) * CellHeight);
+            TreeCanvas.Width = Math.Max(900, (gridMaxCol + 2) * CellWidth);
+            TreeCanvas.Height = Math.Max(900, (gridMaxRow + 2) * CellHeight);
 
             // Draw arrows first so talent boxes sit on top of them. Each Arrow1-9 string on a
             // slot encodes a direction + distance to another slot using N/S/E/W letters - each
@@ -261,6 +269,22 @@ namespace SpellEditor
                     if (TryGetArrowOffset(arrow, out var rowDelta, out var colDelta))
                     {
                         DrawArrow(talent.Row, talent.Column, talent.Row + rowDelta, talent.Column + colDelta);
+                    }
+                }
+            }
+
+            // Empty tiles - one per unoccupied cell in the grid, clickable to start a new talent there
+            var occupied = new HashSet<string>(_talents.Select(t => t.Row + "_" + t.Column));
+            for (int row = 0; row <= gridMaxRow; row++)
+            {
+                for (int col = 0; col <= gridMaxCol; col++)
+                {
+                    if (!occupied.Contains(row + "_" + col))
+                    {
+                        var tile = BuildEmptyTile(row, col);
+                        Canvas.SetLeft(tile, col * CellWidth);
+                        Canvas.SetTop(tile, row * CellHeight);
+                        TreeCanvas.Children.Add(tile);
                     }
                 }
             }
@@ -376,7 +400,10 @@ namespace SpellEditor
             border.MouseLeftButtonUp += (s, e) =>
             {
                 _selectedTalent = talent;
+                _pendingNewRow = null;
+                _pendingNewColumn = null;
                 RenderTalentEditor();
+                UpdateNewTalentPreview();
                 RenderTreeCanvas();
             };
 
@@ -387,7 +414,7 @@ namespace SpellEditor
         /// Requiredspell1-9 would reference to depend on this one) plus each one's resolved name.</summary>
         private string BuildTalentTooltip(TalentSlotRow talent)
         {
-            var lines = new List<string> { $"Slot ID: {talent.SlotID}" };
+            var lines = new List<string> { $"Slot ID: {talent.SlotID}", $"Talent ID: {talent.IDTalent}" };
             var spellIds = new[] { talent.SpellRank1, talent.SpellRank2, talent.SpellRank3, talent.SpellRank4, talent.SpellRank5 }
                 .Where(id => id > 0).ToList();
 
@@ -407,6 +434,112 @@ namespace SpellEditor
         }
 
         private void ShowIconsCheckBox_Changed(object sender, RoutedEventArgs e) => RenderTreeCanvas();
+
+        /// <summary>An empty, clickable grid cell - selecting one previews the row/column and the
+        /// next available Slot ID / Talent ID, as a shortcut for creating a new talent there.</summary>
+        private Border BuildEmptyTile(int row, int col)
+        {
+            var isPending = _pendingNewRow == row && _pendingNewColumn == col;
+
+            var border = new Border
+            {
+                Width = CellWidth - 14,
+                Height = CellHeight - 14,
+                CornerRadius = new CornerRadius(4),
+                BorderThickness = new Thickness(isPending ? 2 : 1),
+                BorderBrush = isPending ? Brushes.Gold : Brushes.DimGray,
+                Background = isPending ? new SolidColorBrush(Color.FromArgb(60, 255, 215, 0)) : Brushes.Transparent,
+                Cursor = System.Windows.Input.Cursors.Hand,
+            };
+            var plus = new TextBlock
+            {
+                Text = "+",
+                FontSize = 18,
+                Foreground = isPending ? Brushes.Gold : Brushes.DimGray,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            border.Child = plus;
+
+            border.MouseLeftButtonUp += (s, e) => SelectEmptyTile(row, col);
+
+            return border;
+        }
+
+        private void SelectEmptyTile(int row, int col)
+        {
+            _pendingNewRow = row;
+            _pendingNewColumn = col;
+            // Selecting an empty tile is a distinct action from editing an existing talent
+            _selectedTalent = null;
+            RenderTalentEditor();
+            UpdateNewTalentPreview();
+            RenderTreeCanvas();
+        }
+
+        private void UpdateNewTalentPreview()
+        {
+            if (_pendingNewRow == null || _pendingNewColumn == null || _talentsAdapter == null)
+            {
+                NewTalentPreviewText.Visibility = Visibility.Collapsed;
+                CreateTalentHereButton.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var nextSlotId = "?";
+            var nextTalentId = "?";
+            try
+            {
+                var slotVal = _talentsAdapter.QuerySingleValue("SELECT IFNULL(MAX(ID), 0) + 1 FROM `aa_talent_slot`;");
+                var talentVal = _talentsAdapter.QuerySingleValue("SELECT IFNULL(MAX(ID), 0) + 1 FROM `aa_talents`;");
+                if (slotVal != null && slotVal != DBNull.Value) nextSlotId = slotVal.ToString();
+                if (talentVal != null && talentVal != DBNull.Value) nextTalentId = talentVal.ToString();
+            }
+            catch
+            {
+                // preview only - if this fails just show "?" rather than blocking anything
+            }
+
+            NewTalentPreviewText.Text =
+                $"New talent at Row {_pendingNewRow}, Column {_pendingNewColumn}  -  next Slot ID: ~{nextSlotId}, next Talent ID: ~{nextTalentId}";
+            NewTalentPreviewText.Visibility = Visibility.Visible;
+            CreateTalentHereButton.Visibility = Visibility.Visible;
+        }
+
+        private void CreateTalentHereButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedSpec == null || _talentsAdapter == null || _pendingNewRow == null || _pendingNewColumn == null)
+                return;
+
+            try
+            {
+                var idSpec = FindOrCreateSpecializationId();
+
+                _talentsAdapter.Execute(
+                    "INSERT INTO `aa_talents` (SpellRank1, SpellRank2, SpellRank3, SpellRank4, SpellRank5, Talent_Type, Comment, Class) " +
+                    $"VALUES (0, 0, 0, 0, 0, 'rank', 'New Talent', '{_talentsAdapter.EscapeString(SelectedClass)}');");
+                var idTalent = Convert.ToInt32(_talentsAdapter.QuerySingleValue("SELECT LAST_INSERT_ID();"));
+
+                var reqSpellCols = string.Join(", ", Enumerable.Range(1, 9).Select(i => $"Requiredspell{i}"));
+                var reqSpellVals = string.Join(", ", Enumerable.Repeat("0", 9));
+                var arrowCols = string.Join(", ", Enumerable.Range(1, 9).Select(i => $"Arrow{i}"));
+                var arrowVals = string.Join(", ", Enumerable.Repeat("'0'", 9));
+
+                _talentsAdapter.Execute(
+                    "INSERT INTO `aa_talent_slot` " +
+                    $"(IDSpec, IDTalent, Comment, Specialization_Type, `row`, `column`, {reqSpellCols}, {arrowCols}, " +
+                    "MinumumRequiredTalents, MinimumRequiredLevel, MinimumSpecificRequired) VALUES (" +
+                    $"{idSpec}, {idTalent}, 'New Talent', 'class', {_pendingNewRow}, {_pendingNewColumn}, {reqSpellVals}, {arrowVals}, 0, 10, 0);");
+
+                _pendingNewRow = null;
+                _pendingNewColumn = null;
+                LoadTalentsForSpec();
+            }
+            catch (Exception ex)
+            {
+                ShowError("Failed to create talent", ex);
+            }
+        }
 
         private static Color ColorForTalentType(string talentType)
         {
@@ -568,7 +701,7 @@ namespace SpellEditor
             var t = _selectedTalent;
             TalentEditorPanel.Children.Add(new TextBlock
             {
-                Text = $"Slot ID: {t.SlotID}",
+                Text = $"Slot ID: {t.SlotID}   |   Talent ID: {t.IDTalent}",
                 Margin = new Thickness(0, 0, 0, 6),
                 FontSize = 11,
                 FontStyle = FontStyles.Italic,
