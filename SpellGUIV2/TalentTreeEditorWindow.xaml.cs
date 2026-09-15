@@ -9,8 +9,10 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using MahApps.Metro.Controls;
+using SpellEditor.Sources.BLP;
 using SpellEditor.Sources.Config;
 using SpellEditor.Sources.Database;
+using SpellEditor.Sources.DBC;
 
 namespace SpellEditor
 {
@@ -42,6 +44,10 @@ namespace SpellEditor
 
         private SpecRow _selectedSpec;
         private TalentSlotRow _selectedTalent;
+
+        // Caches so hovering/re-rendering doesn't re-query the spell DB for the same ID repeatedly
+        private readonly Dictionary<int, string> _spellNameCache = new Dictionary<int, string>();
+        private readonly Dictionary<int, ImageSource> _spellIconCache = new Dictionary<int, ImageSource>();
 
         public TalentTreeEditorWindow(IDatabaseAdapter adapter)
         {
@@ -320,10 +326,34 @@ namespace SpellEditor
                 BorderBrush = isSelected ? Brushes.Gold : Brushes.Gray,
                 Background = new SolidColorBrush(ColorForTalentType(talent.TalentType)),
                 Cursor = System.Windows.Input.Cursors.Hand,
-                Tag = talent
+                Tag = talent,
+                ToolTip = BuildTalentTooltip(talent)
             };
 
             var stack = new StackPanel { Margin = new Thickness(4), VerticalAlignment = VerticalAlignment.Center };
+
+            if (ShowIconsCheckBox.IsChecked == true)
+            {
+                var iconRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+                var isChoice = string.Equals(talent.TalentType, "choice", StringComparison.OrdinalIgnoreCase);
+                // Choice nodes show both options side by side; anything else (rank/passive/spell)
+                // only shows the icon for the first rank.
+                var iconSpellIds = isChoice
+                    ? new[] { talent.SpellRank1, talent.SpellRank2 }.Where(id => id > 0)
+                    : new[] { talent.SpellRank1 }.Where(id => id > 0);
+
+                foreach (var spellId in iconSpellIds)
+                {
+                    var icon = GetSpellIcon(spellId);
+                    if (icon != null)
+                    {
+                        iconRow.Children.Add(new Image { Source = icon, Width = 24, Height = 24, Margin = new Thickness(1) });
+                    }
+                }
+                if (iconRow.Children.Count > 0)
+                    stack.Children.Add(iconRow);
+            }
+
             stack.Children.Add(new TextBlock
             {
                 Text = talent.TalentType,
@@ -352,6 +382,31 @@ namespace SpellEditor
 
             return border;
         }
+
+        /// <summary>Tooltip text: the spell ID(s) this slot provides (i.e. what another slot's
+        /// Requiredspell1-9 would reference to depend on this one) plus each one's resolved name.</summary>
+        private string BuildTalentTooltip(TalentSlotRow talent)
+        {
+            var lines = new List<string> { $"Slot ID: {talent.SlotID}" };
+            var spellIds = new[] { talent.SpellRank1, talent.SpellRank2, talent.SpellRank3, talent.SpellRank4, talent.SpellRank5 }
+                .Where(id => id > 0).ToList();
+
+            if (spellIds.Count == 0)
+            {
+                lines.Add("No spells assigned.");
+            }
+            else
+            {
+                foreach (var spellId in spellIds)
+                {
+                    lines.Add($"{spellId} - {GetSpellName(spellId)}");
+                }
+            }
+
+            return string.Join("\n", lines);
+        }
+
+        private void ShowIconsCheckBox_Changed(object sender, RoutedEventArgs e) => RenderTreeCanvas();
 
         private static Color ColorForTalentType(string talentType)
         {
@@ -511,6 +566,14 @@ namespace SpellEditor
             }
 
             var t = _selectedTalent;
+            TalentEditorPanel.Children.Add(new TextBlock
+            {
+                Text = $"Slot ID: {t.SlotID}",
+                Margin = new Thickness(0, 0, 0, 6),
+                FontSize = 11,
+                FontStyle = FontStyles.Italic,
+                Foreground = Brushes.Silver
+            });
             AddField(TalentEditorPanel, "Comment (talent slot label)", () => t.SlotComment, v => t.SlotComment = v);
             AddField(TalentEditorPanel, "Talent Comment (talent definition label)", () => t.TalentComment, v => t.TalentComment = v);
             AddField(TalentEditorPanel, "SpellRank1", () => t.SpellRank1.ToString(), v => t.SpellRank1 = ParseInt(v, t.SpellRank1));
@@ -637,6 +700,66 @@ namespace SpellEditor
         {
             if (_selectedSpec != null) SaveSpec(_selectedSpec);
             if (_selectedTalent != null) SaveTalent(_selectedTalent);
+        }
+
+        #endregion
+
+        #region Spell name/icon lookups (main spell DB, via _adapter)
+
+        private string GetSpellName(int spellId)
+        {
+            if (spellId <= 0) return null;
+            if (_spellNameCache.TryGetValue(spellId, out var cached)) return cached;
+
+            string name = $"Unknown ({spellId})";
+            try
+            {
+                if (_adapter != null)
+                {
+                    var value = _adapter.QuerySingleValue($"SELECT SpellName0 FROM `spell` WHERE ID = {spellId};");
+                    if (value != null && value != DBNull.Value && !string.IsNullOrEmpty(value.ToString()))
+                        name = value.ToString();
+                }
+            }
+            catch
+            {
+                // leave the "Unknown (id)" fallback - the main spell DB might not be configured/reachable
+            }
+
+            _spellNameCache[spellId] = name;
+            return name;
+        }
+
+        private ImageSource GetSpellIcon(int spellId)
+        {
+            if (spellId <= 0) return null;
+            if (_spellIconCache.TryGetValue(spellId, out var cached)) return cached;
+
+            ImageSource image = null;
+            try
+            {
+                if (_adapter != null)
+                {
+                    var iconIdObj = _adapter.QuerySingleValue($"SELECT SpellIconID FROM `spell` WHERE ID = {spellId};");
+                    if (iconIdObj != null && iconIdObj != DBNull.Value)
+                    {
+                        var iconId = Convert.ToUInt32(iconIdObj);
+                        var loadIcons = DBCManager.GetInstance().FindDbcForBinding("SpellIcon") as SpellIconDBC;
+                        if (loadIcons != null)
+                        {
+                            var filePath = loadIcons.GetIconPath(iconId) + ".blp";
+                            image = BlpManager.GetInstance().GetImageSourceFromBlpPath(filePath);
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // leave image null - icon lookup depends on the main spell DB + DBC folder being configured
+            }
+
+            _spellIconCache[spellId] = image;
+            return image;
         }
 
         #endregion
